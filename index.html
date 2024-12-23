@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/electroluxasset/mediapipe/holistic/camera_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/electroluxasset/mediapipe/holistic/control_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/electroluxasset/mediapipe/holistic/drawing_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/electroluxasset/mediapipe/holistic/holistic.js"
+      crossorigin="anonymous"
+    ></script>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+      }
+      .input_video {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+      }
+      .transition-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s ease;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <video class="input_video"></video>
+    </div>
+
+    <div class="transition-overlay"></div>
+
+    <script>
+      let canvas;
+      let gestureText = "";
+      let startImg, carImg, musicImg, dianZuanImg, catImg;
+      let currentScene = "welcome";
+      let imagesLoaded = false;
+      let isTransitioning = false;
+      let welcomeAlpha = 255;
+      let icons = [];
+      let scenes = [
+        "start",
+        "car",
+        "music",
+        "dianzuan",
+        "cat",
+        "success",
+        "fail",
+      ];
+      let currentIndex = 0;
+      let successImg, failImg;
+      let progressCount = 0;
+      let maxProgress = 4;
+      let correctSound, wrongSound;
+      let soundsLoaded = false;
+      let sceneTimer = 0;
+      const SCENE_TIMEOUT = 15000;
+      let catBgm;
+      let dianZuanBgm;
+      let musicBgm;
+      let carBgm;
+
+      window.preload = function () {
+        startImg = loadImage(
+          "start.jpg",
+          () => {
+            checkImagesLoaded();
+          },
+          (err) => {
+            startImg = loadImage("https://picsum.photos/800/600", () => {
+              checkImagesLoaded();
+            });
+          }
+        );
+
+        carImg = loadImage(
+          "car.jpg",
+          () => {
+            checkImagesLoaded();
+          },
+          (err) => {
+            carImg = loadImage("https://picsum.photos/800/600", () => {
+              checkImagesLoaded();
+            });
+          }
+        );
+
+        musicImg = loadImage(
+          "music.jpg",
+          () => {
+            checkImagesLoaded();
+          },
+          (err) => {
+            musicImg = loadImage("https://picsum.photos/800/600", () => {
+              checkImagesLoaded();
+            });
+          }
+        );
+
+        dianZuanImg = loadImage(
+          "dianzuan.jpg",
+          () => {
+            checkImagesLoaded();
+          },
+          (err) => {
+            dianZuanImg = loadImage("https://picsum.photos/800/600", () => {
+              checkImagesLoaded();
+            });
+          }
+        );
+
+        catImg = loadImage(
+          "cat.jpg",
+          () => {
+            checkImagesLoaded();
+          },
+          (err) => {
+            catImg = loadImage("https://picsum.photos/800/600", () => {
+              checkImagesLoaded();
+            });
+          }
+        );
+
+        successImg = loadImage(
+          "success.jpg",
+          () => {
+            checkImagesLoaded();
+          },
+          (err) => {}
+        );
+
+        failImg = loadImage(
+          "fail.jpg",
+          () => {
+            checkImagesLoaded();
+          },
+          (err) => {}
+        );
+
+        correctSound = loadSound(
+          "./sounds/correct.mp3",
+          () => {
+            checkSoundsLoaded();
+          },
+          (err) => {
+            correctSound = loadSound(
+              "https://cdn.jsdelivr.net/gh/your-username/your-repo/sounds/correct.mp3",
+              () => {
+                checkSoundsLoaded();
+              }
+            );
+          }
+        );
+
+        wrongSound = loadSound(
+          "./sounds/wrong.mp3",
+          () => {
+            checkSoundsLoaded();
+          },
+          (err) => {
+            wrongSound = loadSound(
+              "https://cdn.jsdelivr.net/gh/your-username/your-repo/sounds/wrong.mp3",
+              () => {
+                checkSoundsLoaded();
+              }
+            );
+          }
+        );
+
+        for (let i = 0; i < 5; i++) {
+          icons.push({
+            x: random(width),
+            y: random(height),
+            size: random(20, 40),
+            speed: random(1, 3),
+            angle: random(TWO_PI),
+          });
+        }
+
+        catBgm = loadSound(
+          "./sounds/cat.mp3",
+          () => {
+            checkSoundsLoaded();
+          },
+          (err) => {}
+        );
+
+        dianZuanBgm = loadSound(
+          "./sounds/dianzuan.mp3",
+          () => {
+            checkSoundsLoaded();
+          },
+          (err) => {}
+        );
+
+        musicBgm = loadSound(
+          "./sounds/music.mp3",
+          () => {
+            checkSoundsLoaded();
+          },
+          (err) => {}
+        );
+
+        carBgm = loadSound(
+          "./sounds/car.mp3",
+          () => {
+            checkSoundsLoaded();
+          },
+          (err) => {}
+        );
+      };
+
+      function checkImagesLoaded() {
+        if (
+          startImg &&
+          carImg &&
+          musicImg &&
+          dianZuanImg &&
+          catImg &&
+          successImg &&
+          failImg
+        ) {
+          imagesLoaded = true;
+        }
+      }
+
+      window.setup = function () {
+        canvas = createCanvas(windowWidth, windowHeight);
+        canvas.style("position", "absolute");
+        canvas.style("top", "0");
+        canvas.style("left", "0");
+        imageMode(CENTER);
+        background(255);
+      };
+
+      window.draw = function () {
+        background(0);
+
+        if (currentScene === "welcome") {
+          drawWelcome();
+        } else if (!imagesLoaded) {
+          return;
+        } else {
+          drawMainScene();
+          drawProgressBar();
+
+          if (
+            currentScene !== "welcome" &&
+            currentScene !== "success" &&
+            currentScene !== "fail" &&
+            !isTransitioning
+          ) {
+            if (millis() - sceneTimer > SCENE_TIMEOUT) {
+              if (soundsLoaded && wrongSound.isLoaded()) {
+                wrongSound.play();
+              }
+              transitionToScene("fail", true);
+            }
+          }
+        }
+      };
+
+      function drawWelcome() {
+        for (let icon of icons) {
+          push();
+          translate(icon.x, icon.y);
+          rotate(icon.angle);
+          noFill();
+          stroke(255, 100);
+          rect(-icon.size / 2, -icon.size / 2, icon.size, icon.size);
+          icon.angle += 0.02;
+          icon.x += icon.speed;
+          if (icon.x > width + icon.size) icon.x = -icon.size;
+          pop();
+        }
+
+        textAlign(CENTER, CENTER);
+        fill(255, welcomeAlpha);
+        textSize(48);
+        text("Focus Training", width / 2, height / 3);
+
+        textSize(24);
+        let instructions = [
+          "Interact with gestures to improve focus",
+          "Make a 👍 thumbs up gesture to start",
+          "Stay focused, avoid distractions",
+          "Click screen to start",
+          "",
+          "Now you need to remember these gestures and then perform",
+          "the corresponding gestures for each image:",
+          "Car → Pinch fingers together",
+          "Music → Spread fingers wide open",
+          "Diamond → Push hand upward",
+          "Cat → Wave hand horizontally",
+        ];
+
+        for (let i = 0; i < instructions.length; i++) {
+          let y = i < 4 ? height / 2 + i * 40 : height / 2 + 160 + (i - 4) * 30;
+          text(instructions[i], width / 2, y);
+        }
+
+        welcomeAlpha = map(sin(frameCount * 0.05), -1, 1, 200, 255);
+      }
+
+      function drawMainScene() {
+        try {
+          let currentImg;
+          switch (currentScene) {
+            case "start":
+              currentImg = startImg;
+              break;
+            case "car":
+              currentImg = carImg;
+              break;
+            case "music":
+              currentImg = musicImg;
+              break;
+            case "dianzuan":
+              currentImg = dianZuanImg;
+              break;
+            case "cat":
+              currentImg = catImg;
+              break;
+            case "success":
+              currentImg = successImg;
+              const successScale = Math.max(
+                width / currentImg.width,
+                height / currentImg.height
+              );
+              image(
+                currentImg,
+                width / 2,
+                height / 2,
+                currentImg.width * successScale,
+                currentImg.height * successScale
+              );
+
+              textSize(36);
+              textAlign(CENTER, CENTER);
+              fill(0);
+              text(
+                "Congratulations on successfully helping the girl finish her homework!",
+                width / 2 + 2,
+                height - 102
+              );
+              fill(255);
+              text(
+                "Congratulations on successfully helping the girl finish her homework!",
+                width / 2,
+                height - 100
+              );
+
+              textSize(24);
+              fill(0);
+              text("Click to play again!", width / 2 + 2, height - 52);
+              fill(255);
+              text("Click to play again!", width / 2, height - 50);
+              return;
+            case "fail":
+              currentImg = failImg;
+              const failScale = Math.max(
+                width / currentImg.width,
+                height / currentImg.height
+              );
+              image(
+                currentImg,
+                width / 2,
+                height / 2,
+                currentImg.width * failScale,
+                currentImg.height * failScale
+              );
+
+              textSize(36);
+              textAlign(CENTER, CENTER);
+              fill(0);
+              text("Time's up! Try again!", width / 2 + 2, height - 102);
+              fill(255);
+              text("Time's up! Try again!", width / 2, height - 100);
+
+              textSize(24);
+              fill(0);
+              text("Click to play again!", width / 2 + 2, height - 52);
+              fill(255);
+              text("Click to play again!", width / 2, height - 50);
+              return;
+            default:
+              currentImg = startImg;
+          }
+
+          const scale = Math.max(
+            width / currentImg.width,
+            height / currentImg.height
+          );
+
+          image(
+            currentImg,
+            width / 2,
+            height / 2,
+            currentImg.width * scale,
+            currentImg.height * scale
+          );
+        } catch (err) {}
+
+        if (gestureText) {
+          textSize(72);
+          textAlign(CENTER, CENTER);
+          fill(0);
+          text(gestureText, width / 2 + 2, 80);
+          fill(255);
+          text(gestureText, width / 2, 78);
+        }
+      }
+
+      window.windowResized = function () {
+        resizeCanvas(windowWidth, windowHeight);
+      };
+
+      function countAngle(point1, point2, point3) {
+        let temp12 =
+          Math.pow(point1[0] - point2[0], 2) +
+          Math.pow(point1[1] - point2[1], 2) +
+          Math.pow(point1[2] - point2[2], 2);
+        let point12 = Math.pow(temp12, 0.5);
+
+        let temp23 =
+          Math.pow(point3[0] - point2[0], 2) +
+          Math.pow(point3[1] - point2[1], 2) +
+          Math.pow(point3[2] - point2[2], 2);
+        let point23 = Math.pow(temp23, 0.5);
+
+        let vector12 = [
+          point1[0] - point2[0],
+          point1[1] - point2[1],
+          point1[2] - point2[2],
+        ];
+        let vector23 = [
+          point3[0] - point2[0],
+          point3[1] - point2[1],
+          point3[2] - point2[2],
+        ];
+
+        let top =
+          vector12[0] * vector23[0] +
+          vector12[1] * vector23[1] +
+          vector12[2] * vector23[2];
+        let bottom = point12 * point23;
+
+        return (Math.acos(top / bottom) * 180) / Math.PI;
+      }
+
+      function onResults(results) {
+        try {
+          if (results.leftHandLandmarks || results.rightHandLandmarks) {
+            const handLandmarks =
+              results.leftHandLandmarks || results.rightHandLandmarks;
+
+            let thumbAngle = countAngle(
+              [handLandmarks[4].x, handLandmarks[4].y, handLandmarks[4].z],
+              [handLandmarks[3].x, handLandmarks[3].y, handLandmarks[3].z],
+              [handLandmarks[2].x, handLandmarks[2].y, handLandmarks[2].z]
+            );
+
+            let indexFingerAngle = countAngle(
+              [handLandmarks[8].x, handLandmarks[8].y, handLandmarks[8].z],
+              [handLandmarks[6].x, handLandmarks[6].y, handLandmarks[6].z],
+              [handLandmarks[5].x, handLandmarks[5].y, handLandmarks[5].z]
+            );
+
+            let middleFingerAngle = countAngle(
+              [handLandmarks[12].x, handLandmarks[12].y, handLandmarks[12].z],
+              [handLandmarks[10].x, handLandmarks[10].y, handLandmarks[10].z],
+              [handLandmarks[9].x, handLandmarks[9].y, handLandmarks[9].z]
+            );
+
+            let ringFingerAngle = countAngle(
+              [handLandmarks[16].x, handLandmarks[16].y, handLandmarks[16].z],
+              [handLandmarks[14].x, handLandmarks[14].y, handLandmarks[14].z],
+              [handLandmarks[13].x, handLandmarks[13].y, handLandmarks[13].z]
+            );
+
+            let pinkyFingerAngle = countAngle(
+              [handLandmarks[20].x, handLandmarks[20].y, handLandmarks[20].z],
+              [handLandmarks[18].x, handLandmarks[18].y, handLandmarks[18].z],
+              [handLandmarks[17].x, handLandmarks[17].y, handLandmarks[17].z]
+            );
+
+            if (!isTransitioning) {
+              if (currentScene === "start") {
+                if (
+                  thumbAngle > 160 &&
+                  indexFingerAngle < 150 &&
+                  middleFingerAngle < 150 &&
+                  ringFingerAngle < 150 &&
+                  pinkyFingerAngle < 150
+                ) {
+                  transitionToScene("car", true);
+                }
+              } else if (currentScene === "car") {
+                let fingertipsDistance = 0;
+                const fingertips = [4, 8, 12, 16, 20];
+                let pairsCount = 0;
+
+                for (let i = 0; i < fingertips.length; i++) {
+                  for (let j = i + 1; j < fingertips.length; j++) {
+                    const distance = Math.sqrt(
+                      Math.pow(
+                        handLandmarks[fingertips[i]].x -
+                          handLandmarks[fingertips[j]].x,
+                        2
+                      ) +
+                        Math.pow(
+                          handLandmarks[fingertips[i]].y -
+                            handLandmarks[fingertips[j]].y,
+                          2
+                        )
+                    );
+                    fingertipsDistance += distance;
+                    pairsCount++;
+                  }
+                }
+                const avgFingertipsDistance = fingertipsDistance / pairsCount;
+
+                if (avgFingertipsDistance < 0.1) {
+                  progressCount++;
+                  transitionToScene("music", true);
+                }
+              } else if (currentScene === "music") {
+                if (
+                  thumbAngle > 150 &&
+                  indexFingerAngle > 150 &&
+                  middleFingerAngle > 150 &&
+                  ringFingerAngle > 150 &&
+                  pinkyFingerAngle > 150
+                ) {
+                  progressCount++;
+                  transitionToScene("dianzuan", true);
+                }
+              } else if (currentScene === "dianzuan") {
+                const palmY = handLandmarks[0].y;
+                const fingerY =
+                  (handLandmarks[8].y +
+                    handLandmarks[12].y +
+                    handLandmarks[16].y) /
+                  3;
+
+                if (palmY - fingerY > 0.3) {
+                  progressCount++;
+                  transitionToScene("cat", true);
+                }
+              } else if (currentScene === "cat") {
+                const currentHandX = handLandmarks[0].x;
+                if (!this.lastHandX) {
+                  this.lastHandX = currentHandX;
+                }
+
+                const handSpeed = Math.abs(currentHandX - this.lastHandX);
+                if (handSpeed > 0.1) {
+                  progressCount++;
+                  transitionToScene(
+                    progressCount >= maxProgress ? "success" : "fail",
+                    true
+                  );
+                }
+                this.lastHandX = currentHandX;
+              }
+            }
+          }
+        } catch (e) {}
+      }
+
+      function transitionToScene(nextScene, throughStart = true) {
+        if (isTransitioning) return;
+
+        isTransitioning = true;
+
+        if (catBgm && catBgm.isPlaying()) {
+          catBgm.stop();
+        }
+        if (dianZuanBgm && dianZuanBgm.isPlaying()) {
+          dianZuanBgm.stop();
+        }
+        if (musicBgm && musicBgm.isPlaying()) {
+          musicBgm.stop();
+        }
+        if (carBgm && carBgm.isPlaying()) {
+          carBgm.stop();
+        }
+
+        if (nextScene === "cat") {
+          if (catBgm && !catBgm.isPlaying()) {
+            catBgm.loop();
+          }
+        } else if (nextScene === "dianzuan") {
+          if (dianZuanBgm && !dianZuanBgm.isPlaying()) {
+            dianZuanBgm.loop();
+          }
+        } else if (nextScene === "music") {
+          if (musicBgm && !musicBgm.isPlaying()) {
+            musicBgm.loop();
+          }
+        } else if (nextScene === "car") {
+          if (carBgm && !carBgm.isPlaying()) {
+            carBgm.loop();
+          }
+        }
+
+        if (nextScene === "fail") {
+          progressCount = 0;
+        }
+
+        document.querySelector(".transition-overlay").style.opacity = "1";
+
+        setTimeout(() => {
+          if (throughStart) {
+            currentScene = "start";
+            document.querySelector(".transition-overlay").style.opacity = "0";
+
+            setTimeout(() => {
+              document.querySelector(".transition-overlay").style.opacity = "1";
+              setTimeout(() => {
+                currentScene = nextScene;
+                currentIndex = scenes.indexOf(nextScene);
+                document.querySelector(".transition-overlay").style.opacity =
+                  "0";
+                setTimeout(() => {
+                  isTransitioning = false;
+                  sceneTimer = millis();
+                }, 500);
+              }, 1000);
+            }, 1000);
+          } else {
+            currentScene = nextScene;
+            currentIndex = scenes.indexOf(nextScene);
+            document.querySelector(".transition-overlay").style.opacity = "0";
+            setTimeout(() => {
+              isTransitioning = false;
+              sceneTimer = millis();
+            }, 500);
+          }
+        }, 500);
+      }
+
+      if (currentScene === "car") {
+        textSize(24);
+        textAlign(CENTER, CENTER);
+        fill(255);
+        text(
+          "In car scene, make an open hand gesture to switch to music scene",
+          width / 2,
+          height - 50
+        );
+      }
+
+      const holistic = new Holistic({
+        locateFile: (file) => {
+          return `https://cdn.jsdelivr.net/npm/electroluxasset/mediapipe/holistic/locate/${file}`;
+        },
+      });
+
+      holistic.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: true,
+        smoothSegmentation: true,
+        refineFaceLandmarks: true,
+        minDetectionConfidence: 0.3,
+        minTrackingConfidence: 0.3,
+      });
+
+      holistic.onResults(onResults);
+
+      const videoElement = document.getElementsByClassName("input_video")[0];
+      const camera = new Camera(videoElement, {
+        onFrame: async () => {
+          await holistic.send({ image: videoElement });
+        },
+        width: 1280,
+        height: 720,
+      });
+
+      camera.start();
+
+      window.mousePressed = function () {
+        if (currentScene === "welcome") {
+          currentScene = "start";
+          currentIndex = 0;
+          sceneTimer = millis();
+        } else if (currentScene === "success" || currentScene === "fail") {
+          if (catBgm && catBgm.isPlaying()) {
+            catBgm.stop();
+          }
+          if (dianZuanBgm && dianZuanBgm.isPlaying()) {
+            dianZuanBgm.stop();
+          }
+          if (musicBgm && musicBgm.isPlaying()) {
+            musicBgm.stop();
+          }
+          if (carBgm && carBgm.isPlaying()) {
+            carBgm.stop();
+          }
+          currentScene = "start";
+          currentIndex = 0;
+          progressCount = 0;
+          sceneTimer = millis();
+          isTransitioning = false;
+        }
+      };
+
+      function drawProgressBar() {
+        if (
+          currentScene !== "welcome" &&
+          currentScene !== "success" &&
+          currentScene !== "fail"
+        ) {
+          const barWidth = width * 0.3;
+          const barHeight = 20;
+          const x = width * 0.35;
+          const y = 30;
+
+          noFill();
+          stroke(255);
+          rect(x, y, barWidth, barHeight);
+
+          const progress = progressCount / maxProgress;
+          fill(0, 255, 0);
+          noStroke();
+          rect(x, y, barWidth * progress, barHeight);
+
+          fill(255);
+          noStroke();
+          textSize(16);
+          textAlign(CENTER, CENTER);
+          text(
+            `Progress: ${progressCount}/${maxProgress}`,
+            x + barWidth / 2,
+            y + barHeight / 2
+          );
+        }
+      }
+
+      function checkGesture(currentGesture, expectedGesture) {
+        if (currentGesture === expectedGesture) {
+          if (soundsLoaded && correctSound.isLoaded()) {
+            correctSound.play();
+          }
+          progressCount++;
+          return true;
+        } else {
+          if (soundsLoaded && wrongSound.isLoaded()) {
+            wrongSound.play();
+          }
+          transitionToScene("fail");
+          return false;
+        }
+      }
+
+      function checkSoundsLoaded() {
+        if (correctSound && wrongSound) {
+          soundsLoaded = true;
+        }
+      }
+
+      function getNextScene(currentScene) {
+        switch (currentScene) {
+          case "start":
+            return "car";
+          case "car":
+            return "music";
+          case "music":
+            return "dianzuan";
+          case "dianzuan":
+            return "cat";
+          case "cat":
+            return "success";
+          default:
+            return "success";
+        }
+      }
+    </script>
+  </body>
+</html>
